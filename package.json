@@ -1,0 +1,7 @@
+{
+  "name": "ege-russian-2027-trainer",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {"test": "node tests/trainer.cjs"},
+  "devDependencies": {"jsdom": "31.0.0"}
+}

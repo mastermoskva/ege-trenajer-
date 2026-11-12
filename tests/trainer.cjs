@@ -1,0 +1,20 @@
+const {JSDOM}=require('jsdom');const fs=require('fs');const assert=require('node:assert/strict');
+const html=fs.readFileSync(require('path').join(__dirname,'../index.html'),'utf8');const qs=JSON.parse(fs.readFileSync(require('path').join(__dirname,'../questions.json')));
+const dom=new JSDOM(html,{url:'https://example.org/ege/',runScripts:'dangerously',beforeParse(w){w.scrollTo=()=>{};w.confirm=()=>true;w.alert=m=>{throw Error(m)}}});const w=dom.window,d=w.document;const run=s=>w.eval(s),click=id=>{assert(d.getElementById(id),id);d.getElementById(id).click()};
+assert.equal(run('QUESTIONS.length'),150);assert.equal(new Set(qs.map(x=>x.n)).size,150);
+assert.equal(run('JSON.stringify(QUESTIONS)'),JSON.stringify(qs));
+for(const q of qs){assert(q.e);assert(run(`TOPICS[${JSON.stringify(q.t)}]`));if(q.y==='m'){assert(q.a>=0&&q.a<q.o.length);assert.equal(new Set(q.o).size,q.o.length)}if(q.y==='e'){assert(q.a.length>=2&&q.a.length<=4)}}
+run("startSession([QUESTIONS[0]],{kind:'topic',topic:'check'})");run('answer(false,1)');assert.equal(run('Object.keys(data.errors).length'),1);run('answer(false,1)');assert.equal(run('data.history[1].wrong'),1);click('next');assert(d.querySelector('.session-fin'));
+run("startMistakes('all')");run('answer(true,0)');assert.equal(run('Object.keys(data.errors).length'),0);
+run("go('collections')");d.getElementById('collectionName').value='<test>';click('miniSave');assert.equal(run('data.collections.length'),1);assert.equal(run('new Set(data.collections[0].ids).size'),10);assert(d.body.textContent.includes('<test>'));assert(!d.querySelector('test'));
+const saved=run('JSON.stringify(data)');assert.equal(run(`restoreProgress(JSON.parse(${JSON.stringify(saved)})).collections.length`),1);
+d.querySelector('[data-run]').click();assert.equal(run('session.ids.length'),10);assert(d.body.textContent.includes('<test>'));
+run("go('collections')");d.querySelectorAll('[name=miniTopic]').forEach(x=>x.checked=x.value==='dict');d.getElementById('miniCount').value='5';click('miniSave');assert.equal(run('data.collections.length'),2);assert(run("data.collections[1].ids.every(id=>INDEX.get(String(id)).t==='dict')"));
+d.querySelector('[data-delete]').click();assert.equal(run('data.collections.length'),1);assert.equal(run('data.history[1].right'),1);
+run("go('collections')");d.querySelectorAll('[name=miniTopic]').forEach(x=>x.checked=false);click('miniSave');assert.equal(run('data.collections.length'),1);
+run("startSession([QUESTIONS.find(q=>q.y==='x')],{kind:'topic',topic:'check'})");run("document.querySelectorAll('[data-pick]').forEach(el=>el.value=question().p[session.currentOrder[Number(el.dataset.pick)]][1])");click('check');assert.equal(run('session.correct'),1);
+run("startSession([QUESTIONS.find(q=>q.y==='e')],{kind:'topic',topic:'exam'})");run("document.querySelectorAll('[data-exam]').forEach(el=>el.checked=question().a.includes(Number(el.dataset.exam)))");click('check');assert.equal(run('session.correct'),1);assert(d.getElementById('feedback').textContent.includes('Верно'));
+run("startSession([QUESTIONS.find(q=>q.y==='e')],{kind:'topic',topic:'exam'})");click('dontknow');assert.equal(run('session.wrong'),1);assert(d.getElementById('feedback').textContent.includes('Правильные ряды'));
+run("go('settings')");assert(d.getElementById('export'));assert(d.getElementById('import'));assert(!/фарм|530|545|ЦНС|коллоквиум/i.test(d.body.textContent));
+click('resetAll');assert.equal(run('data.collections.length'),0);assert.equal(run('Object.keys(data.history).length'),0);assert.equal(run('Object.keys(data.errors).length'),0);
+console.log('PASS: bank integrity, single answer, duplicate-answer guard, mistakes, results, matching, multiple rows, unknown answer, mini-test topics, saving, replay, deleting, restore, HTML escaping and reset.');dom.window.close();
